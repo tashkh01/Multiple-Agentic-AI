@@ -90,9 +90,13 @@ def call_anthropic(api_key: str, model: str, post: str) -> str:
     return "".join(getattr(b, "text", "") for b in res.content).strip()
 
 def call_gemini(api_key: str, model: str, original: str, a: str, b: str) -> str:
-    g = genai.Client(api_key=google_key)
+    g = genai.Client(api_key=api_key)
     cfg = GenerateContentConfig(temperature=0.4, max_output_tokens=900)
-    out = g.models.generate_content(model=model, contents=prompt_combine(original, a, b), config=cfg)
+    out = g.models.generate_content(
+        model=model,
+        contents=prompt_combine(original, a, b),
+        config=cfg
+    )
     return out.text.strip()
 
 def critic_gpt(api_key: str, model: str, text: str, min_w: int, max_w: int) -> str:
@@ -105,9 +109,13 @@ def critic_gpt(api_key: str, model: str, text: str, min_w: int, max_w: int) -> s
     return res.choices[0].message.content.strip()
 
 def revise_gemini(api_key: str, model: str, text: str, notes: str) -> str:
-    g = genai.Client(api_key=google_key)
+    g = genai.Client(api_key=api_key)
     cfg = GenerateContentConfig(temperature=0.3, max_output_tokens=900)
-    out = g.models.generate_content(model=model, contents=prompt_revise(text, notes), config=cfg)
+    out = g.models.generate_content(
+        model=model,
+        contents=prompt_revise(text, notes),
+        config=cfg
+    )
     return out.text.strip()
 
 # --- Run pipeline ---
