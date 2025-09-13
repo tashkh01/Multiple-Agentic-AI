@@ -34,9 +34,11 @@ st.markdown("---")
 st.write("### Original Post")
 original_post = st.text_area("Paste the discussion prompt/post here:", height=240)
 
+# Buttons
 colA, colB = st.columns(2)
 run = colA.button("Generate")
 clear = colB.button("Clear")
+
 # Divider line (optional)
 st.markdown("---")
 
@@ -65,7 +67,7 @@ if test:
                 model=anthropic_model or "claude-3-5-sonnet-latest",
                 max_tokens=5,
                 temperature=0.0,
-                messages=[{"role":"user","content":"Ping"}],
+                messages=[{"role": "user", "content": "Ping"}],
             )
             st.success("Anthropic: OK")
         else:
@@ -90,3 +92,6 @@ if test:
     except Exception as e:
         st.error("Gemini ping failed.")
         if debug: st.exception(e)
+
+# Continue with rest of your UI
+st.subheader("Models (override if needed)")
