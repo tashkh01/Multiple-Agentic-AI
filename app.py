@@ -16,6 +16,8 @@ with st.sidebar:
     openai_key = st.text_input("OpenAI API Key", type="password")
     anthropic_key = st.text_input("Anthropic API Key", type="password")
     google_key = st.text_input("Google (Gemini) API Key", type="password")
+    
+debug = st.sidebar.checkbox("Debug mode", value=False)
 
     st.markdown("---")
     st.subheader("Models (override if needed)")
@@ -35,6 +37,55 @@ original_post = st.text_area("Paste the discussion prompt/post here:", height=24
 colA, colB = st.columns(2)
 run = colA.button("Generate")
 clear = colB.button("Clear")
+test = st.button("Test keys (ping providers)")
+if test:
+    # --- OpenAI ping ---
+    try:
+        client = OpenAI(api_key=openai_key)
+        _ = client.chat.completions.create(
+            model=openai_model or "gpt-4o-mini",
+            messages=[{"role": "user", "content": "Ping"}],
+            temperature=0.0,
+            max_tokens=5,
+        )
+        st.success("OpenAI: OK")
+    except Exception as e:
+        st.error("OpenAI ping failed.")
+        if debug: st.exception(e)
+
+    # --- Anthropic ping ---
+    try:
+        if anthropic_key:
+            aclient = anthropic.Anthropic(api_key=anthropic_key)
+            _ = aclient.messages.create(
+                model=anthropic_model or "claude-3-5-sonnet-latest",
+                max_tokens=5,
+                temperature=0.0,
+                messages=[{"role": "user", "content": "Ping"}],
+            )
+            st.success("Anthropic: OK")
+        else:
+            st.info("Anthropic: no key provided")
+    except Exception as e:
+        st.error("Anthropic ping failed.")
+        if debug: st.exception(e)
+
+    # --- Gemini ping ---
+    try:
+        if google_key:
+            g = genai.Client(api_key=google_key)
+            cfg = GenerateContentConfig(temperature=0.0, max_output_tokens=5)
+            _ = g.models.generate_content(
+                model=gemini_model or "gemini-1.5-flash",
+                contents="Ping",
+                config=cfg,
+            )
+            st.success("Gemini: OK")
+        else:
+            st.info("Gemini: no key provided")
+    except Exception as e:
+        st.error("Gemini ping failed.")
+        if debug: st.exception(e)
 
 if clear:
     st.experimental_rerun()
@@ -122,48 +173,78 @@ def revise_gemini(api_key: str, model: str, text: str, notes: str) -> str:
 if run:
     if not attest:
         st.error("Please check the attestation box to proceed.")
-    elif not (openai_key and anthropic_key and google_key):
-        st.error("Please enter all three API keys in the sidebar.")
     elif len(original_post.strip()) < 20:
         st.error("Please paste a longer original post (≥ 20 characters).")
     else:
+        peer_a, peer_b, combined = "", "", ""
+        review, final, revised = "", "", False
+
+        # --- OpenAI (GPT) ---
         try:
-            with st.spinner("ChatGPT 5 Auto drafting…"):
+            with st.spinner("ChatGPT drafting…"):
+                if not openai_key:
+                    raise RuntimeError("Missing OpenAI key.")
                 peer_a = call_openai(openai_key, openai_model, original_post)
-            with st.spinner("Claude Sonnet 4 drafting…"):
-                peer_b = call_anthropic(anthropic_key, anthropic_model, original_post)
+            st.success("OpenAI OK")
+        except Exception as e:
+            st.error("OpenAI error. Check key/model (try model: gpt-4o-mini).")
+            if debug: st.exception(e)
 
-            st.success("Drafts ready.")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write("#### Peer Response A — ChatGPT 5 Auto")
-                st.write(peer_a)
-            with col2:
-                st.write("#### Peer Response B — Claude Sonnet 4")
-                st.write(peer_b)
+        # --- Anthropic (Claude) ---
+        try:
+            if anthropic_key:
+                with st.spinner("Claude drafting…"):
+                    peer_b = call_anthropic(anthropic_key, anthropic_model, original_post)
+                st.success("Anthropic OK")
+            else:
+                st.info("Skipping Claude (no key).")
+        except Exception as e:
+            st.error("Anthropic error. Common causes: $5 prepay needed, invalid key, or model id. Try: claude-3-5-sonnet-latest.")
+            if debug: st.exception(e)
 
-            with st.spinner("Gemini 2.5 Flash combining…"):
-                combined = call_gemini(google_key, gemini_model, original_post, peer_a, peer_b)
+        # --- Gemini (Combine) ---
+        try:
+            if google_key and peer_a and peer_b:
+                with st.spinner("Gemini combining…"):
+                    combined = call_gemini(google_key, gemini_model, original_post, peer_a, peer_b)
+                st.success("Gemini (combine) OK")
+            elif not google_key:
+                st.info("Skipping Gemini combine (no Google key).")
+            elif not (peer_a and peer_b):
+                st.info("Skipping Gemini combine (need both GPT and Claude drafts).")
+        except Exception as e:
+            st.error("Gemini error. Check key/model (try model: gemini-1.5-flash) or quota.")
+            if debug: st.exception(e)
+
+        # Show drafts if present
+        if peer_a:
+            st.write("#### Peer Response A — ChatGPT")
+            st.write(peer_a)
+        if peer_b:
+            st.write("#### Peer Response B — Claude")
+            st.write(peer_b)
+        if combined:
             st.write("#### Combined (Gemini initial)")
             st.write(combined)
 
-            with st.spinner("Critiquing & (if needed) revising…"):
-                review = critic_gpt(openai_key, openai_model, combined, int(min_words), int(max_words))
-                verdict = review.splitlines()[0].strip().upper()
-                if verdict.startswith("PASS"):
-                    final = combined
-                    revised = False
-                else:
-                    final = revise_gemini(google_key, gemini_model, combined, review)
-                    revised = True
+        # --- Critique & Revise (only if we have a combine) ---
+        try:
+            if combined and openai_key:
+                with st.spinner("Critiquing & (if needed) revising…"):
+                    review = critic_gpt(openai_key, openai_model, combined, int(min_words), int(max_words))
+                    verdict = review.splitlines()[0].strip().upper()
+                    if verdict.startswith("PASS"):
+                        final = combined
+                        revised = False
+                    else:
+                        final = revise_gemini(google_key, gemini_model, combined, review) if google_key else combined
+                        revised = not verdict.startswith("PASS")
 
-            st.write("#### Reviewer Notes")
-            st.code(review)
-            st.write("#### Final Polished")
-            st.write(final)
-
-            st.info(f"Closed-loop status: {'Revised' if revised else 'Passed on first try'}")
-
+                st.write("#### Reviewer Notes")
+                st.code(review)
+                st.write("#### Final Polished")
+                st.write(final)
+                st.info(f"Closed-loop status: {'Revised' if revised else 'Passed on first try'}")
         except Exception as e:
-            # Avoid exposing sensitive details
-            st.error("Generation failed. Check your keys/models and try again.")
+            st.error("Critique/revise step failed.")
+            if debug: st.exception(e)
