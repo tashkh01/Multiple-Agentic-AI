@@ -11,25 +11,25 @@ st.caption("Pipeline: OpenAI → Anthropic → Gemini (combine) → optional cri
 
 # ---------- Sidebar: Keys ----------
 with st.sidebar:
-st.subheader("Bring Your Own Keys (required)")
+    st.subheader("Bring Your Own Keys (required)")
     openai_key = st.text_input("OpenAI API Key (sk-...)", type="password")
     anthropic_key = st.text_input("Anthropic API Key (sk-ant-...)", type="password")
     google_key = st.text_input("Google (Gemini) API Key (AIza...)", type="password")
 
-st.markdown("---")
-st.subheader("Models (override if needed)")
+    st.markdown("---")
+    st.subheader("Models (override if needed)")
     # Use widely available defaults
     openai_model = st.text_input("OpenAI model", value="gpt-4o-mini")
     anthropic_model = st.text_input("Anthropic model", value="claude-3-5-sonnet-latest")
     gemini_model = st.text_input("Gemini model", value="gemini-1.5-flash")
 
-st.markdown("---")
-st.subheader("Guardrails")
+    st.markdown("---")
+    st.subheader("Guardrails")
     attest = st.checkbox("I will use this for drafting/learning and follow my institution’s rules.", value=False)
     min_words = st.number_input("Min words", value=150, step=10)
     max_words = st.number_input("Max words", value=250, step=10)
 
-st.markdown("---")
+    st.markdown("---")
     debug = st.checkbox("Debug mode (show detailed errors)", value=False)
 
 # ---------- Prompts ----------
