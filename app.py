@@ -20,7 +20,7 @@ with st.sidebar:
 debug = st.sidebar.checkbox("Debug mode", value=False)
 
 st.markdown("---")
-    st.subheader("Models (override if needed)")
+st.subheader("Models (override if needed)")
     openai_model = st.text_input("OpenAI model", value="gpt-5-auto")
     anthropic_model = st.text_input("Anthropic model", value="claude-sonnet-4")
     gemini_model = st.text_input("Gemini model", value="gemini-2.5-flash")
